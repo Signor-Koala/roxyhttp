@@ -1,0 +1,9 @@
+CMakeLists.txt.user
+
+build/
+pages/
+
+
+.envrc
+.cache
+.direnv

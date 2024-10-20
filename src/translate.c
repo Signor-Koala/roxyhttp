@@ -103,60 +103,57 @@ regex_t mime_type_re;
 
 void compile_regexes() {
 
-  const char *http_methods[2] = {
-      "GET ([[:graph:]]*) HTTP/[0-9][.]?[0-9]?",
-      "PUT ([[:graph:]]*) HTTP/[0-9][.]?[0-9]?",
-  };
-  const char forbidden_path[] = "/../";
-  const char mime_type[] = "[.]([A-Za-z0-9]*)$";
+    const char *http_methods[2] = {
+        "GET ([[:graph:]]*) HTTP/[0-9][.]?[0-9]?",
+        "PUT ([[:graph:]]*) HTTP/[0-9][.]?[0-9]?",
+    };
+    const char forbidden_path[] = "/../";
+    const char mime_type[] = "[.]([A-Za-z0-9]*)$";
 
-  int regex_status;
-  char buf[100];
-  for (uint i = 0; i < sizeof(http_methods) / sizeof(char *); i++) {
-    if ((regex_status =
-             regcomp(&http_methods_re[i], http_methods[i], REG_EXTENDED))) {
-      regerror(regex_status, &http_methods_re[i], buf, 100);
-      fprintf(stderr, "%s http regex compilation error: %s\n", http_methods[i],
-              buf);
-      exit(1);
+    int regex_status;
+    char buf[100];
+    for (uint i = 0; i < sizeof(http_methods) / sizeof(char *); i++) {
+        if ((regex_status =
+                 regcomp(&http_methods_re[i], http_methods[i], REG_EXTENDED))) {
+            regerror(regex_status, &http_methods_re[i], buf, 100);
+            fprintf(stderr, "%s http regex compilation error: %s\n",
+                    http_methods[i], buf);
+            exit(1);
+        }
     }
-  }
-  if ((regex_status = regcomp(&forbidden_re, forbidden_path, REG_EXTENDED))) {
-    regerror(regex_status, &forbidden_re, buf, 100);
-    fprintf(stderr, "%s forbidden regex compilation error: %s\n",
-            forbidden_path, buf);
-    exit(1);
-  }
-  if ((regex_status = regcomp(&mime_type_re, mime_type, REG_EXTENDED))) {
-    regerror(regex_status, &mime_type_re, buf, 100);
-    fprintf(stderr, "%s mime regex compilation error: %s\n", mime_type, buf);
-    exit(1);
-  }
+    if ((regex_status = regcomp(&forbidden_re, forbidden_path, REG_EXTENDED))) {
+        regerror(regex_status, &forbidden_re, buf, 100);
+        fprintf(stderr, "%s forbidden regex compilation error: %s\n",
+                forbidden_path, buf);
+        exit(1);
+    }
+    if ((regex_status = regcomp(&mime_type_re, mime_type, REG_EXTENDED))) {
+        regerror(regex_status, &mime_type_re, buf, 100);
+        fprintf(stderr, "%s mime regex compilation error: %s\n", mime_type,
+                buf);
+        exit(1);
+    }
 }
 
 req request_decode(char *request) {
-  int regex_status;
-  regmatch_t rm[2];
-  req req_details = {
-      NONE,
-      NULL,
-  };
+    int regex_status;
+    regmatch_t rm[2];
+    req req_details = {
+        NONE,
+        NULL,
+    };
 
-  for (uint i = 0; i < sizeof(http_methods_re); i++) {
-    if (!(regex_status = regexec(&http_methods_re[i], request, 2, rm, 0))) {
-      req_details.method = i + 1;
+    for (uint i = 0; i < sizeof(http_methods_re); i++) {
+        if (!(regex_status = regexec(&http_methods_re[i], request, 2, rm, 0))) {
+            req_details.method = i + 1;
 
-      if (!(rm[1].rm_so == rm[1].rm_eo)) {
-        int l = rm[1].rm_eo - rm[1].rm_so + 1;
-        req_details.path = malloc(l * sizeof(char));
-        strlcpy(req_details.path, request + rm[1].rm_so, l);
-      }
-      break;
-    } else if (regex_status == REG_NOMATCH) {
-      printf("NO MATCH\n %s\n", request);
-    } else {
-      printf("fail %d", regex_status);
+            if (!(rm[1].rm_so == rm[1].rm_eo)) {
+                int l = rm[1].rm_eo - rm[1].rm_so + 1;
+                req_details.path = malloc(l * sizeof(char));
+                strlcpy(req_details.path, request + rm[1].rm_so, l);
+            }
+            break;
+        }
     }
-  }
-  return req_details;
+    return req_details;
 }

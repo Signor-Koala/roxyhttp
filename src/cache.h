@@ -3,18 +3,18 @@
 
 #include <pthread.h>
 #include <stddef.h>
-#define MAX_CACHE_ENTRIES 4 // 100
-#define MAX_ENTRY_SIZE 4096 // 1048576
+
+#include "main.h"
 // I'll try this later
 // #define MAX_TOTAL_SIZE 8196  // 10485760
 
 struct lru_table {
-  pthread_mutex_t lock;
-  long last_time;
-  long time_accessed[MAX_CACHE_ENTRIES];
-  size_t data_size[MAX_CACHE_ENTRIES];
-  char *keys[MAX_CACHE_ENTRIES];
-  char *data[MAX_CACHE_ENTRIES];
+    pthread_mutex_t lock;
+    long last_time;
+    long *time_accessed;
+    size_t *data_size;
+    char *keys;
+    char *data;
 };
 
 typedef struct lru_table lru_table;

@@ -1,6 +1,7 @@
 #include "handlers.h"
 #include <fcntl.h>
 #include <regex.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +15,10 @@
 static const char header_200[] = "HTTP/1.1 200 OK\r\n"
                                  "Content-Type: %s\r\n"
                                  "\r\n";
+
+static const char header_200_http[] = "HTTP/1.1 200 OK\r\n"
+                                      "Content-Type: text/html\r\n"
+                                      "\r\n";
 
 static const char header_404[] = "HTTP/1.1 404 Not Found\r\n"
                                  "Content-Type: text/plain\r\n"
@@ -90,4 +95,12 @@ size_t handle_get(req request, char **response, lru_table *cache) {
 
         return response_size;
     }
+}
+
+size_t add_200_header(char **response) {
+    size_t size_res = sizeof(header_200_http);
+    *response = malloc(conf_buffer_size);
+
+    strlcpy(*response, header_200_http, conf_buffer_size);
+    return size_res;
 }

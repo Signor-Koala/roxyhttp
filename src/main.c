@@ -100,6 +100,8 @@ int main(int argc, char *argv[]) {
     pthread_mutexattr_setpshared(&attrmutex, PTHREAD_PROCESS_SHARED);
     pthread_mutex_init(&(cache->lock), &attrmutex);
 
+    init_overrides(L);
+
     if ((rv = getaddrinfo(NULL, conf_port, &hints, &servinfo))) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(rv));
         exit(1);
@@ -186,8 +188,10 @@ int main(int argc, char *argv[]) {
             size_t response_size;
             char *response = NULL;
 
-            if (0) {
-                // TODO: Handle overrides here
+            response_size = override_handler(L, request, &response);
+
+            if (response_size) {
+                // pass
             } else if (request.method == GET) {
                 response_size = handle_get(request, &response, cache);
             }

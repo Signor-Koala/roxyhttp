@@ -5,7 +5,7 @@
 #include <lua.h>
 
 extern char *get_config(lua_State *L);
-extern int init_overrides(lua_State *L);
-size_t override_handler(lua_State *L, req request, char **response);
+extern int init_handlers(lua_State *L);
+size_t get_handler_response(lua_State *L, req request, char **response);
 
 #endif // !OVERRIDES_H

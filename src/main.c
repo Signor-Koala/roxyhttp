@@ -20,10 +20,10 @@
 #include <unistd.h>
 
 #include "cache.h"
-#include "handlers.h"
+#include "default_handlers.h"
 #include "main.h"
-#include "overrides.h"
 #include "translate.h"
+#include "user_handlers.h"
 
 #define BACKLOG 10
 char conf_port[6] = "8080";
@@ -79,11 +79,6 @@ int main(int argc, char *argv[]) {
     conf_file_path = (char *)malloc(sizeof(char) * 3);
     conf_file_path = "./";
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-
     compile_regexes();
 
     L = luaL_newstate();
@@ -100,7 +95,24 @@ int main(int argc, char *argv[]) {
     pthread_mutexattr_setpshared(&attrmutex, PTHREAD_PROCESS_SHARED);
     pthread_mutex_init(&(cache->lock), &attrmutex);
 
-    init_overrides(L);
+    init_handlers(L);
+
+    sa.sa_handler = sigchild_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+        perror("sigaction: ");
+        exit(1);
+    }
+    signal(SIGINT, intHandler);
+    signal(SIGTERM, intHandler);
+
+    pid_t parentPID = getpid();
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
 
     if ((rv = getaddrinfo(NULL, conf_port, &hints, &servinfo))) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(rv));
@@ -137,18 +149,6 @@ int main(int argc, char *argv[]) {
     }
 
     freeaddrinfo(servinfo);
-
-    sa.sa_handler = sigchild_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        perror("sigaction: ");
-        exit(1);
-    }
-    signal(SIGINT, intHandler);
-    signal(SIGTERM, intHandler);
-
-    pid_t parentPID = getpid();
 
     printf("server: waiting for connections...\n");
 
@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
             size_t response_size;
             char *response = NULL;
 
-            response_size = override_handler(L, request, &response);
+            response_size = get_handler_response(L, request, &response);
 
             if (response_size) {
                 // pass

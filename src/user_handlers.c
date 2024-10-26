@@ -1,4 +1,4 @@
-#include "handlers.h"
+#include "default_handlers.h"
 #include "main.h"
 #include <lauxlib.h>
 #include <lua.h>
@@ -22,13 +22,13 @@ static const char *keys[] = {
 };
 
 const char *confname = "config.lua";
-const char *override_table_file = "overrides.lua";
+const char *handler_table_file = "handlers.lua";
 
 static struct {
     size_t n;
     regex_t *patterns;
-    char **override;
-} override_table;
+    char **handler;
+} handler_table;
 
 char *get_config(lua_State *L) {
 
@@ -82,9 +82,9 @@ char *get_config(lua_State *L) {
     return ptr;
 }
 
-int init_overrides(lua_State *L) {
+int init_handlers(lua_State *L) {
 
-    if (luaL_loadfile(L, override_table_file)) {
+    if (luaL_loadfile(L, handler_table_file)) {
         fprintf(stderr, "Cannot load override table file");
         return 1;
     }
@@ -98,7 +98,7 @@ int init_overrides(lua_State *L) {
         return 3;
     }
 
-    override_table.n = 0;
+    handler_table.n = 0;
 
     lua_pushnil(L);
     size_t pathn, funcn;
@@ -107,9 +107,9 @@ int init_overrides(lua_State *L) {
     while (lua_next(L, -2) != 0) {
         lua_pushvalue(L, -2);
 
-        override_table.n++;
-        char **p = realloc(paths, override_table.n * sizeof(char *));
-        char **f = realloc(funcs, override_table.n * sizeof(char *));
+        handler_table.n++;
+        char **p = realloc(paths, handler_table.n * sizeof(char *));
+        char **f = realloc(funcs, handler_table.n * sizeof(char *));
         if (p != NULL && f != NULL) {
             paths = p;
             funcs = f;
@@ -121,22 +121,22 @@ int init_overrides(lua_State *L) {
         const char *key = lua_tolstring(L, -1, &pathn);
         const char *value = lua_tolstring(L, -2, &funcn);
 
-        paths[override_table.n - 1] = malloc((pathn + 1) * sizeof(char));
-        funcs[override_table.n - 1] = malloc((funcn + 1) * sizeof(char));
+        paths[handler_table.n - 1] = malloc((pathn + 1) * sizeof(char));
+        funcs[handler_table.n - 1] = malloc((funcn + 1) * sizeof(char));
 
-        strlcpy(paths[override_table.n - 1], key, pathn + 1);
-        strlcpy(funcs[override_table.n - 1], value, funcn + 1);
+        strlcpy(paths[handler_table.n - 1], key, pathn + 1);
+        strlcpy(funcs[handler_table.n - 1], value, funcn + 1);
         lua_pop(L, 2);
     }
 
-    override_table.patterns = malloc(override_table.n * sizeof(regex_t));
-    override_table.override = funcs;
+    handler_table.patterns = malloc(handler_table.n * sizeof(regex_t));
+    handler_table.handler = funcs;
     int regex_status = 0;
     char buf[100];
-    for (uint i = 0; i < override_table.n; i++) {
-        if ((regex_status = regcomp(&override_table.patterns[i], paths[i],
-                                    REG_EXTENDED))) {
-            regerror(regex_status, &override_table.patterns[i], buf, 100);
+    for (uint i = 0; i < handler_table.n; i++) {
+        if ((regex_status =
+                 regcomp(&handler_table.patterns[i], paths[i], REG_EXTENDED))) {
+            regerror(regex_status, &handler_table.patterns[i], buf, 100);
             fprintf(stderr, "%s override regex compilation error: %s\n",
                     paths[i], buf);
             exit(1);
@@ -146,8 +146,8 @@ int init_overrides(lua_State *L) {
     return 0;
 }
 
-size_t override_exec(lua_State *L, req request, char **response,
-                     char *handler_name) {
+size_t exec_handler(lua_State *L, req request, char **response,
+                    char *handler_name) {
     lua_getglobal(L, handler_name);
 
     lua_newtable(L);
@@ -188,13 +188,12 @@ size_t override_exec(lua_State *L, req request, char **response,
     return res_len;
 }
 
-size_t override_handler(lua_State *L, req request, char **response) {
+size_t get_handler_response(lua_State *L, req request, char **response) {
     int status;
-    for (uint i = 0; i < override_table.n; i++) {
-        status = regexec(&override_table.patterns[i], request.path, 0, NULL, 0);
+    for (uint i = 0; i < handler_table.n; i++) {
+        status = regexec(&handler_table.patterns[i], request.path, 0, NULL, 0);
         if (!status) {
-            return override_exec(L, request, response,
-                                 override_table.override[i]);
+            return exec_handler(L, request, response, handler_table.handler[i]);
         }
     }
     return 0;

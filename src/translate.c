@@ -1,9 +1,9 @@
+#include "main.h"
 #include <regex.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "main.h"
 
 const char *mime_type_out[] = {
     "audio/aac",
@@ -97,30 +97,17 @@ const char *mime_type_in[] = {
     "xul",  "zip",  "3gp",  "3g2",    "7z",
 };
 
-regex_t http_methods_re[2];
 regex_t forbidden_re;
 regex_t mime_type_re;
 
 void compile_regexes() {
 
-    const char *http_methods[2] = {
-        "GET ([[:graph:]]*) HTTP/[0-9][.]?[0-9]?",
-        "PUT ([[:graph:]]*) HTTP/[0-9][.]?[0-9]?",
-    };
     const char forbidden_path[] = "/../";
     const char mime_type[] = "[.]([A-Za-z0-9]*)$";
 
     int regex_status;
     char buf[100];
-    for (uint i = 0; i < sizeof(http_methods) / sizeof(char *); i++) {
-        if ((regex_status =
-                 regcomp(&http_methods_re[i], http_methods[i], REG_EXTENDED))) {
-            regerror(regex_status, &http_methods_re[i], buf, 100);
-            fprintf(stderr, "%s http regex compilation error: %s\n",
-                    http_methods[i], buf);
-            exit(1);
-        }
-    }
+
     if ((regex_status = regcomp(&forbidden_re, forbidden_path, REG_EXTENDED))) {
         regerror(regex_status, &forbidden_re, buf, 100);
         fprintf(stderr, "%s forbidden regex compilation error: %s\n",
@@ -135,25 +122,49 @@ void compile_regexes() {
     }
 }
 
-req request_decode(char *request) {
-    int regex_status;
-    regmatch_t rm[2];
-    req req_details = {
-        NONE,
-        NULL,
-    };
+hheader split_hheader(char *header_header) {
+    hheader h;
+    h.method = strtok(header_header, " ");
+    h.path = strtok(NULL, " ");
+    h.protocol = strtok(NULL, "");
+    return h;
+}
 
-    for (uint i = 0; i < sizeof(http_methods_re); i++) {
-        if (!(regex_status = regexec(&http_methods_re[i], request, 2, rm, 0))) {
-            req_details.method = i + 1;
-
-            if (!(rm[1].rm_so == rm[1].rm_eo)) {
-                int l = rm[1].rm_eo - rm[1].rm_so + 1;
-                req_details.path = malloc(l * sizeof(char));
-                strlcpy(req_details.path, request + rm[1].rm_so, l);
-            }
-            break;
+char **split_request(char *request, size_t req_len, size_t *body_len,
+                     size_t *n) {
+    *body_len = req_len;
+    char **l = realloc(NULL, sizeof(char *));
+    if (l == NULL) {
+        perror("Error while allocating memory for splitting request\n");
+        exit(1);
+    }
+    l[0] = strtok(request, "\n");
+    int len = strlen(l[0]);
+    *body_len -= len + 1;
+    if (l[0][len - 1] == '\r') {
+        l[0][len - 1] = '\0';
+    }
+    for (int i = 1;; i++) {
+        char **temp = realloc(l, sizeof(char *) * (i + 1));
+        if (temp == NULL) {
+            perror("Error while allocating memory for splitting request\n");
+            exit(1);
+        }
+        l = temp;
+        l[i] = strtok(NULL, "\n");
+        if (l[i] == NULL) {
+            fprintf(stderr, "No more \\n found");
+            exit(1);
+        }
+        int len = strlen(l[i]);
+        *body_len -= len + 1;
+        if (l[i][len - 1] == '\r') {
+            l[i][len - 1] = '\0';
+        }
+        if (len < 2) {
+            l[i] = strtok(NULL, "");
+            *n = i + 1;
+            return l;
         }
     }
-    return req_details;
 }

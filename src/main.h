@@ -8,13 +8,13 @@ enum req_method {
     PUT,
 };
 
-struct req {
-    enum req_method method;
+struct hheader {
+    char *method;
     char *path;
-    // Add the rest here later
+    char *protocol;
 };
 
-typedef struct req req;
+typedef struct hheader hheader;
 
 extern char conf_port[6];
 extern size_t conf_buffer_size;

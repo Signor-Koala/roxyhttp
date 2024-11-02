@@ -35,22 +35,20 @@ static const char header_500[] = "HTTP/1.1 500 Internal Server Error\r\n"
                                  "\r\n"
                                  "502 Internal Server Error";
 
-size_t handle_get(req request, char **response, lru_table *cache) {
+size_t handle_get(hheader req, char **response, lru_table *cache) {
     char filepath[conf_max_filepath];
     strlcpy(filepath, conf_file_path, conf_max_filepath);
     *response = malloc(conf_buffer_size);
 
-    if (!strcmp(request.path, "/")) {
+    if (!strcmp(req.path, "/")) {
         strlcat(filepath, "/index.html", sizeof(filepath));
-    } else if (!(regexec(&forbidden_re, request.path, 0, NULL, 0))) {
+    } else if (!(regexec(&forbidden_re, req.path, 0, NULL, 0))) {
         strlcpy(*response, header_403, conf_buffer_size);
         fprintf(stderr, "FORBIDDEN");
-        free(request.path);
         return strlen(header_403);
     } else {
-        strlcat(filepath, request.path, sizeof(filepath));
+        strlcat(filepath, req.path, sizeof(filepath));
     }
-    free(request.path);
 
     struct stat st;
     if (stat(filepath, &st)) {

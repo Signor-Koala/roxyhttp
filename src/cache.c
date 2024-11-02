@@ -70,10 +70,6 @@ size_t get_cache(void *cache, char *buf, char *key) {
 }
 
 void update_cache(void *cache, char *key, char *data, size_t data_size) {
-    size_t cache_size =
-        sizeof(lru_table) +
-        conf_max_cache_entries * (conf_max_entry_size + conf_max_filepath +
-                                  sizeof(size_t) + sizeof(long));
     if (data_size > conf_max_entry_size)
         return;
     lru_table *table = (lru_table *)cache;

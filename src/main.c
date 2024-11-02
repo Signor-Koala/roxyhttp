@@ -177,23 +177,34 @@ int main(int argc, char *argv[]) {
             if (getppid() != parentPID)
                 exit(1);
 
-            if (recv(client_sock, buffer, conf_buffer_size, 0) == -1) {
+            ssize_t req_size = recv(client_sock, buffer, conf_buffer_size, 0);
+            if (req_size == -1) {
                 perror("recv: ");
                 close(client_sock);
                 exit(0);
+            } else if (req_size > conf_buffer_size) {
+                fprintf(stderr, "Request too long\n");
+                exit(0);
             }
 
-            req request = request_decode(buffer);
+            size_t body_size, line_num;
+            char **lines =
+                split_request(buffer, req_size, &body_size, &line_num);
+
+            hheader req_hheader = split_hheader(lines[0]);
 
             size_t response_size;
             char *response = NULL;
-
-            response_size = get_handler_response(L, request, &response);
+            response_size = get_handler_response(
+                L, req_hheader, lines, line_num, body_size, &response);
 
             if (response_size) {
                 // pass
-            } else if (request.method == GET) {
-                response_size = handle_get(request, &response, cache);
+            } else if (!strcmp(req_hheader.method, "GET")) {
+                response_size = handle_get(req_hheader, &response, cache);
+            } else {
+                fprintf(stderr, "Unsupported request");
+                exit(1);
             }
 
             int num = response_size / conf_buffer_size;

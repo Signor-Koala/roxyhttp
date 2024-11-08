@@ -27,7 +27,7 @@
 
 #define BACKLOG 10
 char conf_port[6] = "8080";
-size_t conf_buffer_size = 2048;
+size_t conf_buffer_size = 8196;
 size_t conf_max_filepath = 256;
 size_t conf_max_response_size = 16777216;
 size_t conf_max_cache_entries = 4;
@@ -177,34 +177,77 @@ int main(int argc, char *argv[]) {
             if (getppid() != parentPID)
                 exit(1);
 
-            ssize_t req_size = recv(client_sock, buffer, conf_buffer_size, 0);
-            if (req_size == -1) {
-                perror("recv: ");
-                close(client_sock);
-                exit(0);
-            } else if (req_size > conf_buffer_size) {
-                fprintf(stderr, "Request too long\n");
-                exit(0);
+            // TODO: Add a timeout for recv
+            size_t body_size, line_num, header_size = 0, req_size = 0;
+            hheader req_hheader;
+            char *end_of_header = NULL;
+            char **lines;
+            while (1) {
+                ssize_t recv_size = recv(client_sock, &buffer[req_size],
+                                         conf_buffer_size - req_size, 0);
+                fprintf(stderr, "Rec\n");
+
+                if (recv_size == -1) {
+                    perror("recv: ");
+                    close(client_sock);
+                    exit(0);
+                }
+                req_size += recv_size;
+                if (req_size > conf_buffer_size) {
+                    fprintf(stderr, "Request too long\n");
+                    close(client_sock);
+                    exit(0);
+                }
+                if (end_of_header == NULL)
+                    end_of_header = strstr(buffer, "\r\n\r\n");
+                if (end_of_header == NULL) {
+                    fprintf(
+                        stderr,
+                        "Header not fully recieved, resuming\n%s\n--------\n",
+                        buffer);
+                    continue;
+                }
+                if (header_size == 0) {
+                    end_of_header = &end_of_header[5];
+                    header_size = end_of_header - buffer;
+                    lines = split_request(buffer, req_size, &line_num);
+                    req_hheader = split_hheader(lines[0]);
+                    int status = build_request(L, req_hheader, lines, line_num,
+                                               &body_size);
+                    if (status) {
+                        fprintf(stderr, "SOMETHING HAPPENED\n");
+                        exit(1);
+                    }
+                    if (body_size == 0) {
+                        lua_pushnil(L);
+                        lua_setfield(L, -2, "body");
+                        fprintf(stderr, "No body attached\n");
+                        break;
+                    }
+                }
+                if (req_size - header_size == body_size) {
+                    lua_pushlstring(L, lines[line_num - 1], body_size);
+                    lua_setfield(L, -2, "body");
+                } else if (req_size - header_size < body_size) {
+                    fprintf(stderr, "Body not fully recieved, resuming");
+                    continue;
+                } else {
+                    fprintf(stderr, "Garbage data written?");
+                    exit(0);
+                }
             }
-
-            size_t body_size, line_num;
-            char **lines =
-                split_request(buffer, req_size, &body_size, &line_num);
-
-            hheader req_hheader = split_hheader(lines[0]);
 
             size_t response_size;
             char *response = NULL;
-            response_size = get_handler_response(
-                L, req_hheader, lines, line_num, body_size, &response);
+            response_size = get_handler_response(L, req_hheader, &response);
 
-            if (response_size) {
-                // pass
-            } else if (!strcmp(req_hheader.method, "GET")) {
-                response_size = handle_get(req_hheader, &response, cache);
-            } else {
-                fprintf(stderr, "Unsupported request");
-                exit(1);
+            if (!response_size) {
+                if (!strcmp(req_hheader.method, "GET")) {
+                    response_size = handle_get(req_hheader, &response, cache);
+                } else {
+                    fprintf(stderr, "Unsupported request");
+                    exit(1);
+                }
             }
 
             int num = response_size / conf_buffer_size;

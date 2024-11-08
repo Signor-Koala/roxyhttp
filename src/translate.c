@@ -1,9 +1,11 @@
 #include "main.h"
+#include <lua.h>
 #include <regex.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 const char *mime_type_out[] = {
     "audio/aac",
@@ -130,9 +132,32 @@ hheader split_hheader(char *header_header) {
     return h;
 }
 
-char **split_request(char *request, size_t req_len, size_t *body_len,
-                     size_t *n) {
-    *body_len = req_len;
+int build_request(lua_State *L, hheader req_hh, char **request, size_t line_n,
+                  size_t *body_size) {
+    lua_newtable(L);
+    lua_pushstring(L, req_hh.method);
+    lua_setfield(L, -2, "method");
+    lua_pushstring(L, req_hh.path);
+    lua_setfield(L, -2, "path");
+    lua_pushstring(L, req_hh.protocol);
+    lua_setfield(L, -2, "protocol");
+    for (uint i = 1; i < line_n; i++) {
+        if (i == line_n - 1) {
+            return 0;
+        }
+        char *key = strtok(request[i], ":");
+        char *value = strtok(NULL, "") + sizeof(char);
+        if (strcasecmp(key, "Content-Length")) {
+            *body_size = atoi(value);
+        }
+        lua_pushstring(L, value);
+        lua_setfield(L, -2, key);
+    }
+    fprintf(stderr, "Malformed packet");
+    exit(0);
+}
+
+char **split_request(char *request, size_t req_len, size_t *n) {
     char **l = realloc(NULL, sizeof(char *));
     if (l == NULL) {
         perror("Error while allocating memory for splitting request\n");
@@ -140,7 +165,6 @@ char **split_request(char *request, size_t req_len, size_t *body_len,
     }
     l[0] = strtok(request, "\n");
     int len = strlen(l[0]);
-    *body_len -= len + 1;
     if (l[0][len - 1] == '\r') {
         l[0][len - 1] = '\0';
     }
@@ -157,7 +181,6 @@ char **split_request(char *request, size_t req_len, size_t *body_len,
             exit(1);
         }
         int len = strlen(l[i]);
-        *body_len -= len + 1;
         if (l[i][len - 1] == '\r') {
             l[i][len - 1] = '\0';
         }

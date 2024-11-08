@@ -253,33 +253,6 @@ int init_handlers(lua_State *L) {
     return 0;
 }
 
-int build_request(lua_State *L, hheader req_hh, char **request, size_t line_n,
-                  size_t body_size) {
-    lua_newtable(L);
-    lua_pushstring(L, req_hh.method);
-    lua_setfield(L, -2, "method");
-    lua_pushstring(L, req_hh.path);
-    lua_setfield(L, -2, "path");
-    lua_pushstring(L, req_hh.protocol);
-    lua_setfield(L, -2, "protocol");
-    for (uint i = 1; i < line_n; i++) {
-        if (i == line_n - 1) {
-            if (request[i] == NULL)
-                lua_pushnil(L);
-            else
-                lua_pushlstring(L, request[i], body_size);
-
-            lua_setfield(L, -2, "body");
-            return 0;
-        }
-        char *key = strtok(request[i], ":");
-        lua_pushstring(L, strtok(NULL, "") + sizeof(char));
-        lua_setfield(L, -2, key);
-    }
-    fprintf(stderr, "Malformed packet");
-    exit(0);
-}
-
 size_t build_response(lua_State *L, char **response) {
     size_t res_len;
     if (lua_istable(L, -1)) {
@@ -316,10 +289,8 @@ size_t build_response(lua_State *L, char **response) {
     return res_len;
 }
 
-size_t exec_handler(lua_State *L, hheader req_hh, char **request, size_t line_n,
-                    size_t body_size, char **response, char *handler_name) {
-    lua_getglobal(L, handler_name);
-    build_request(L, req_hh, request, line_n, body_size);
+size_t exec_handler(lua_State *L, hheader req_hh, char **response,
+                    char *handler_name) {
 
     int status;
     for (uint i = 0; i < middleware_table.n; i++) {
@@ -332,6 +303,8 @@ size_t exec_handler(lua_State *L, hheader req_hh, char **request, size_t line_n,
             }
         }
     }
+    lua_getglobal(L, handler_name);
+    lua_insert(L, -2);
 
     if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
         fprintf(stderr, "Error running function %s\n %s\n", handler_name,
@@ -345,14 +318,12 @@ size_t exec_handler(lua_State *L, hheader req_hh, char **request, size_t line_n,
     return res_len;
 }
 
-size_t get_handler_response(lua_State *L, hheader req_hh, char **request,
-                            size_t line_n, size_t body_size, char **response) {
+size_t get_handler_response(lua_State *L, hheader req_hh, char **response) {
     int status;
     for (uint i = 0; i < handler_table.n; i++) {
         status = regexec(&handler_table.patterns[i], req_hh.path, 0, NULL, 0);
         if (!status) {
-            return exec_handler(L, req_hh, request, line_n, body_size, response,
-                                handler_table.handler[i]);
+            return exec_handler(L, req_hh, response, handler_table.handler[i]);
         }
     }
     return 0;

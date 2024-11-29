@@ -13,7 +13,9 @@ functions that directly process the request and produce a response, which is don
 This project is currently mostly incomplete and has many rough edges.
 
 ## Prerequisites
-- cmake >= 3.30
+- `cmake >= 3.22`
+- `gcc >= 11.4`
+- `libbsd >= 11.5`
 - \<add others here\>
 
 ## Setup
@@ -28,7 +30,7 @@ This project is currently mostly incomplete and has many rough edges.
 
 The executable produced resides in `build/roxyhttp`
 
-Currently only tested with Arch Linux
+Currently tested with Arch Linux and Ubuntu 20.04 LTS
 
 ## Usage
 TODO!

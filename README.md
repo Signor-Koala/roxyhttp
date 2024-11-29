@@ -13,14 +13,22 @@ functions that directly process the request and produce a response, which is don
 This project is currently mostly incomplete and has many rough edges.
 
 ## Prerequisites
-- cmake >= 3.10
-- lua 5.4
+- cmake >= 3.30
 - \<add others here\>
 
 ## Setup
-TODO!
 
-Have to test systems other than Arch
+    git clone https://github.com/Signor-Koala/roxyhttp.git
+
+    cd roxyhttp
+
+    cmake -B build
+
+    cmake --build build
+
+The executable produced resides in `build/roxyhttp`
+
+Currently only tested with Arch Linux
 
 ## Usage
 TODO!

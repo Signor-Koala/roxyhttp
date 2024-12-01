@@ -136,6 +136,7 @@ hheader split_hheader(char *header_header) {
 int build_request(lua_State *L, hheader req_hh, char **request, size_t line_n,
                   size_t *body_size) {
     lua_newtable(L);
+    lua_newtable(L);
     lua_pushstring(L, req_hh.method);
     lua_setfield(L, -2, "method");
     lua_pushstring(L, req_hh.path);
@@ -144,6 +145,7 @@ int build_request(lua_State *L, hheader req_hh, char **request, size_t line_n,
     lua_setfield(L, -2, "protocol");
     for (uint i = 1; i < line_n; i++) {
         if (i == line_n - 1) {
+            lua_setfield(L, -2, "header");
             return 0;
         }
         char *key = strtok(request[i], ":");

@@ -37,6 +37,7 @@ static struct {
     char **middleware;
 } middleware_table;
 
+// For Debugging
 static void stackDump(lua_State *L) {
     int i;
     int top = lua_gettop(L); /* depth of the stack */
@@ -266,7 +267,7 @@ size_t build_response(lua_State *L, char **response) {
             exit(1);
         }
 
-        header_len = add_200_header(response);
+        header_len = add_200_header_http(response);
         res_len = header_len + len;
 
         if (res_len > conf_buffer_size) {
@@ -302,8 +303,7 @@ size_t exec_handler(lua_State *L, hheader req_hh, char **response,
                 fprintf(stderr, "Error running function %s\n %s\n",
                         middleware_table.middleware[i], lua_tostring(L, -1));
                 lua_settop(L, 0);
-                // TODO: Send ERROR 500
-                exit(0);
+                return INTERNAL_ERROR;
             }
         }
     }
@@ -314,8 +314,7 @@ size_t exec_handler(lua_State *L, hheader req_hh, char **response,
         fprintf(stderr, "Error running function %s\n %s\n", handler_name,
                 lua_tostring(L, -1));
         lua_settop(L, 0);
-        // TODO: Send ERROR 500
-        exit(0);
+        return INTERNAL_ERROR;
     }
 
     size_t res_len = build_response(L, response);

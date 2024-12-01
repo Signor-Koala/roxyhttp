@@ -79,7 +79,7 @@ size_t handle_get(hheader req, char **response, lru_table *cache) {
     }
 }
 
-size_t add_200_header(char **response) {
+size_t add_200_header_http(char **response) {
     size_t size_res = sizeof(header_200_http);
     *response = malloc(conf_buffer_size);
 

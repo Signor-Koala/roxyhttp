@@ -182,6 +182,8 @@ int main(int argc, char *argv[]) {
             hheader req_hheader;
             char *end_of_header = NULL;
             char **lines;
+
+            // TODO: Extract this into a seperate function
             while (1) {
                 ssize_t recv_size = recv(client_sock, &buffer[req_size],
                                          conf_buffer_size - req_size, 0);
@@ -194,6 +196,7 @@ int main(int argc, char *argv[]) {
                 }
                 req_size += recv_size;
                 if (req_size > conf_buffer_size) {
+                    // TODO: Send ERROR 400
                     fprintf(stderr, "Request too long\n");
                     close(client_sock);
                     exit(0);
@@ -208,14 +211,15 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 if (header_size == 0) {
-                    end_of_header = &end_of_header[5];
+                    end_of_header = &end_of_header[4];
                     header_size = end_of_header - buffer;
                     lines = split_request(buffer, req_size, &line_num);
                     req_hheader = split_hheader(lines[0]);
                     int status = build_request(L, req_hheader, lines, line_num,
                                                &body_size);
                     if (status) {
-                        fprintf(stderr, "SOMETHING HAPPENED\n");
+                        fprintf(stderr, "Request building failed with : %d\n",
+                                status);
                         exit(1);
                     }
                     if (body_size == 0) {
@@ -228,11 +232,17 @@ int main(int argc, char *argv[]) {
                 if (req_size - header_size == body_size) {
                     lua_pushlstring(L, lines[line_num - 1], body_size);
                     lua_setfield(L, -2, "body");
+                    break;
                 } else if (req_size - header_size < body_size) {
-                    fprintf(stderr, "Body not fully recieved, resuming");
+                    fprintf(stderr,
+                            "Body not fully recieved, resuming, got body_size: "
+                            "%zu, & received: %zu\n",
+                            body_size, req_size - header_size);
                     continue;
                 } else {
-                    fprintf(stderr, "Garbage data written?");
+                    fprintf(stderr, "Garbage data read\n");
+                    // TODO: Send ERROR 400
+                    close(client_sock);
                     exit(0);
                 }
             }

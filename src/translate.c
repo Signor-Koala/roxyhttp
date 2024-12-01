@@ -147,7 +147,7 @@ int build_request(lua_State *L, hheader req_hh, char **request, size_t line_n,
         }
         char *key = strtok(request[i], ":");
         char *value = strtok(NULL, "") + sizeof(char);
-        if (strcasecmp(key, "Content-Length")) {
+        if (!strcasecmp(key, "Content-Length")) {
             *body_size = atoi(value);
         }
         lua_pushstring(L, value);

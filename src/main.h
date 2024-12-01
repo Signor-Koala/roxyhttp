@@ -8,6 +8,17 @@ enum req_method {
     PUT,
 };
 
+enum ERROR_STATUS {
+    OK = 0,
+    INVALID_REQUEST = -1,
+    REQUEST_TOO_LONG = -2,
+    HTTP_PROTO_NOT_IMP = -3,
+    FILE_NOT_FOUND = -4,
+    FORBIDDEN = -5,
+    INTERNAL_ERROR = -6,
+    METHOD_NOT_ALLOWED = -7,
+};
+
 struct hheader {
     char *method;
     char *path;

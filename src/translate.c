@@ -1,3 +1,4 @@
+#include "translate.h"
 #include "main.h"
 #include <lua.h>
 #include <regex.h>
@@ -153,11 +154,10 @@ int build_request(lua_State *L, hheader req_hh, char **request, size_t line_n,
         lua_pushstring(L, value);
         lua_setfield(L, -2, key);
     }
-    fprintf(stderr, "Malformed packet");
-    exit(0);
+    return 1;
 }
 
-char **split_request(char *request, size_t req_len, size_t *n) {
+char **split_request(char *request, size_t *n) {
     char **l = realloc(NULL, sizeof(char *));
     if (l == NULL) {
         perror("Error while allocating memory for splitting request\n");
@@ -180,7 +180,7 @@ char **split_request(char *request, size_t req_len, size_t *n) {
             fprintf(stderr, "No more \\n found");
             exit(1);
         }
-        int len = strlen(l[i]);
+        len = strlen(l[i]);
         if (l[i][len - 1] == '\r') {
             l[i][len - 1] = '\0';
         }

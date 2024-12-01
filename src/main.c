@@ -182,24 +182,28 @@ int main(int argc, char *argv[]) {
             hheader req_hheader;
             char *end_of_header = NULL;
             char **lines;
+            enum ERROR_STATUS error_status = INVALID_REQUEST;
 
             // TODO: Extract this into a seperate function
+            /**
+             * Receive the entirity of the request and turn it into a usable
+             * format. Most of the request is encoded into a lua table with the
+             * exception of the first line. Any errors reading the request are
+             * also detected and noted in the `req_status` enum
+             */
             while (1) {
                 ssize_t recv_size = recv(client_sock, &buffer[req_size],
                                          conf_buffer_size - req_size, 0);
-                fprintf(stderr, "Rec\n");
 
                 if (recv_size == -1) {
                     perror("recv: ");
                     close(client_sock);
-                    exit(0);
+                    exit(1);
                 }
                 req_size += recv_size;
                 if (req_size > conf_buffer_size) {
-                    // TODO: Send ERROR 400
-                    fprintf(stderr, "Request too long\n");
-                    close(client_sock);
-                    exit(0);
+                    error_status = REQUEST_TOO_LONG;
+                    break;
                 }
                 if (end_of_header == NULL)
                     end_of_header = strstr(buffer, "\r\n\r\n");
@@ -213,53 +217,77 @@ int main(int argc, char *argv[]) {
                 if (header_size == 0) {
                     end_of_header = &end_of_header[4];
                     header_size = end_of_header - buffer;
-                    lines = split_request(buffer, req_size, &line_num);
+                    lines = split_request(buffer, &line_num);
                     req_hheader = split_hheader(lines[0]);
+                    if (strcmp(req_hheader.protocol, "HTTP/1.1")) {
+                        fprintf(stderr, "|%s|\n!=\n|%s|\n",
+                                req_hheader.protocol, "HTTP/1.1");
+                        error_status = HTTP_PROTO_NOT_IMP;
+                        break;
+                    }
                     int status = build_request(L, req_hheader, lines, line_num,
                                                &body_size);
                     if (status) {
-                        fprintf(stderr, "Request building failed with : %d\n",
-                                status);
-                        exit(1);
+                        error_status = INVALID_REQUEST;
+                        break;
                     }
                     if (body_size == 0) {
                         lua_pushnil(L);
                         lua_setfield(L, -2, "body");
                         fprintf(stderr, "No body attached\n");
+                        error_status = OK;
                         break;
                     }
                 }
                 if (req_size - header_size == body_size) {
                     lua_pushlstring(L, lines[line_num - 1], body_size);
                     lua_setfield(L, -2, "body");
+                    error_status = OK;
                     break;
-                } else if (req_size - header_size < body_size) {
-                    fprintf(stderr,
-                            "Body not fully recieved, resuming, got body_size: "
-                            "%zu, & received: %zu\n",
-                            body_size, req_size - header_size);
-                    continue;
-                } else {
+                } else if (req_size - header_size > body_size) {
                     fprintf(stderr, "Garbage data read\n");
-                    // TODO: Send ERROR 400
-                    close(client_sock);
-                    exit(0);
+                    error_status = INVALID_REQUEST;
+                    break;
                 }
             }
+            if (shutdown(client_sock, SHUT_RD)) {
+                perror("shutdown: ");
+                close(client_sock);
+                exit(1);
+            }
 
-            size_t response_size;
+            /**
+             * Construction of response based on the request
+             */
+            size_t response_size; // +ve = Response size (No Errors);
+                                  // 0 = User Handler not found;
+                                  // -ve = ERROR_STATUS enum;
             char *response = NULL;
-            response_size = get_handler_response(L, req_hheader, &response);
 
-            if (!response_size) {
-                if (!strcmp(req_hheader.method, "GET")) {
-                    response_size = handle_get(req_hheader, &response, cache);
-                } else {
-                    fprintf(stderr, "Unsupported request");
-                    exit(1);
+            if (error_status == OK) {
+                response_size = get_handler_response(L, req_hheader, &response);
+
+                if (response_size == 0) {
+                    if (!strcmp(req_hheader.method, "GET")) {
+                        response_size =
+                            handle_get(req_hheader, &response, cache);
+                    } else {
+                        error_status = METHOD_NOT_ALLOWED;
+                    }
+                }
+                if (response_size < 0) {
+                    error_status = response_size;
                 }
             }
 
+            if (error_status != OK) {
+                // TODO: Implement handling of invalid requests
+                exit(1);
+            }
+
+            /**
+             * Sending of the response constructed
+             */
             int num = response_size / conf_buffer_size;
             for (int i = 0; i < num; i++) {
                 if (send(client_sock, &response[i * conf_buffer_size],

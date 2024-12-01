@@ -291,7 +291,6 @@ size_t build_response(lua_State *L, char **response) {
 
 size_t exec_handler(lua_State *L, hheader req_hh, char **response,
                     char *handler_name) {
-
     int status;
     for (uint i = 0; i < middleware_table.n; i++) {
         status =
@@ -300,6 +299,11 @@ size_t exec_handler(lua_State *L, hheader req_hh, char **response,
             lua_getglobal(L, middleware_table.middleware[i]);
             lua_insert(L, -2);
             if (lua_pcall(L, 1, 1, 0)) {
+                fprintf(stderr, "Error running function %s\n %s\n",
+                        middleware_table.middleware[i], lua_tostring(L, -1));
+                lua_settop(L, 0);
+                // TODO: Send ERROR 500
+                exit(0);
             }
         }
     }
@@ -310,7 +314,8 @@ size_t exec_handler(lua_State *L, hheader req_hh, char **response,
         fprintf(stderr, "Error running function %s\n %s\n", handler_name,
                 lua_tostring(L, -1));
         lua_settop(L, 0);
-        return 0;
+        // TODO: Send ERROR 500
+        exit(0);
     }
 
     size_t res_len = build_response(L, response);

@@ -20,21 +20,6 @@ static const char header_200_http[] = "HTTP/1.1 200 OK\r\n"
                                       "Content-Type: text/html\r\n"
                                       "\r\n";
 
-static const char header_404[] = "HTTP/1.1 404 Not Found\r\n"
-                                 "Content-Type: text/plain\r\n"
-                                 "\r\n"
-                                 "404 Not Found";
-
-static const char header_403[] = "HTTP/1.1 403 Forbidden\r\n"
-                                 "Content-Type: text/plain\r\n"
-                                 "\r\n"
-                                 "403 Forbidden";
-
-static const char header_500[] = "HTTP/1.1 500 Internal Server Error\r\n"
-                                 "Content-Type: text/plain\r\n"
-                                 "\r\n"
-                                 "502 Internal Server Error";
-
 size_t handle_get(hheader req, char **response, lru_table *cache) {
     char filepath[conf_max_filepath];
     strlcpy(filepath, conf_file_path, conf_max_filepath);
@@ -43,26 +28,25 @@ size_t handle_get(hheader req, char **response, lru_table *cache) {
     if (!strcmp(req.path, "/")) {
         strlcat(filepath, "/index.html", sizeof(filepath));
     } else if (!(regexec(&forbidden_re, req.path, 0, NULL, 0))) {
-        strlcpy(*response, header_403, conf_buffer_size);
-        fprintf(stderr, "FORBIDDEN");
-        return strlen(header_403);
+        // `..` found in path requested
+        return FORBIDDEN;
     } else {
         strlcat(filepath, req.path, sizeof(filepath));
     }
 
     struct stat st;
     if (stat(filepath, &st)) {
-        strlcpy(*response, header_404, conf_buffer_size);
-        return strlen(header_404);
+        return FILE_NOT_FOUND;
     } else {
         if (conf_max_response_size < st.st_size + sizeof(header_200)) {
-            fprintf(stderr, "REQUESTED PAGE TOO LARGE\n");
-            strlcpy(*response, header_500, conf_buffer_size);
-            return strlen(header_500);
+            // REQUESTED PAGE TOO LARGE
+            return INTERNAL_ERROR;
         }
 
         char header_ok[conf_buffer_size];
         regmatch_t rm[2];
+
+        /* Checking the file type to set the mime type header */
         if (!(regexec(&mime_type_re, filepath, 2, rm, 0))) {
             for (uint i = 0; i < sizeof(mime_type_in); i++) {
                 if (!strcmp(&filepath[rm[1].rm_so], mime_type_in[i])) {

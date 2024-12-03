@@ -212,10 +212,7 @@ int main(int argc, char *argv[]) {
                 if (end_of_header == NULL)
                     end_of_header = strstr(buffer, "\r\n\r\n");
                 if (end_of_header == NULL) {
-                    fprintf(
-                        stderr,
-                        "Header not fully recieved, resuming\n%s\n--------\n",
-                        buffer);
+                    // Header not fully recieved, resuming
                     continue;
                 }
                 if (header_size == 0) {
@@ -224,8 +221,6 @@ int main(int argc, char *argv[]) {
                     lines = split_request(buffer, &line_num);
                     req_hheader = split_hheader(lines[0]);
                     if (strcmp(req_hheader.protocol, "HTTP/1.1")) {
-                        fprintf(stderr, "|%s|\n!=\n|%s|\n",
-                                req_hheader.protocol, "HTTP/1.1");
                         error_status = HTTP_PROTO_NOT_IMP;
                         break;
                     }
@@ -284,9 +279,8 @@ int main(int argc, char *argv[]) {
             }
 
             if (error_status != OK) {
-                fprintf(stderr, "Errored\n");
                 response_size = handle_error(L, error_status, &response);
-                if (response_size <= 0) {
+                if ((long)response_size <= 0) {
                     fprintf(stderr, "Error handling failed");
                     exit(0);
                 }

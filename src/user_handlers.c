@@ -255,6 +255,35 @@ int init_handlers(lua_State *L) {
     return 0;
 }
 
+int table_getintfield(lua_State *L, const char *key, int *val) {
+    int result, isnum;
+    lua_pushstring(L, key);
+    lua_gettable(L, -2);
+    result = (int)lua_tonumberx(L, -1, &isnum);
+    if (!isnum) {
+        fprintf(stderr, "key: %s is not an integer", key);
+        return -1;
+    }
+    lua_pop(L, 1);
+    *val = result;
+    return 0;
+}
+
+int table_getstringfield(lua_State *L, const char *key, char *val,
+                         size_t *len) {
+    lua_pushstring(L, key);
+    lua_gettable(L, -2);
+    const char *s = lua_tolstring(L, -1, len);
+    if (s == NULL || !(*len)) {
+        fprintf(stderr, "key: %s is not a valid string", key);
+        return -1;
+    }
+    val = malloc((*len) + 1);
+    strlcpy(val, s, (*len));
+    lua_pop(L, 1);
+    return 0;
+}
+
 size_t build_response(lua_State *L, char **response) {
     size_t res_len;
     if (lua_istable(L, -1)) {

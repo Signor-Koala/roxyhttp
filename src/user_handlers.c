@@ -37,7 +37,7 @@ static struct {
     char **middleware;
 } middleware_table;
 
-// For Debugging
+// NOTE: For Debugging
 static void stackDump(lua_State *L) {
     int i;
     int top = lua_gettop(L); /* depth of the stack */
@@ -68,6 +68,7 @@ static void stackDump(lua_State *L) {
     fprintf(stderr, "----------------------------------------\n");
 }
 
+// TODO: Make this nicer to maintain
 char *get_config(lua_State *L) {
 
     if (luaL_loadfile(L, confname) || lua_pcall(L, 0, 0, 0))
@@ -267,7 +268,7 @@ size_t build_response(lua_State *L, char **response) {
             exit(1);
         }
 
-        header_len = add_200_header_http(response);
+        header_len = add_200_header_html(response);
         res_len = header_len + len;
 
         if (res_len > conf_buffer_size) {

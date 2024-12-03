@@ -1,5 +1,5 @@
-#include "default_handlers.h"
 #include <fcntl.h>
+#include <lua.h>
 #include <regex.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -16,9 +16,18 @@ static const char header_200[] = "HTTP/1.1 200 OK\r\n"
                                  "Content-Type: %s\r\n"
                                  "\r\n";
 
-static const char header_200_http[] = "HTTP/1.1 200 OK\r\n"
+static const char header_200_html[] = "HTTP/1.1 200 OK\r\n"
                                       "Content-Type: text/html\r\n"
                                       "\r\n";
+
+static const char header_500_text[] = "HTTP/1.1 500 Internal Server Error\r\n"
+                                      "Content-Type: text/plain\r\n"
+                                      "Content-Length: 25\r\n"
+                                      "\r\n"
+                                      "500 Internal Server Error";
+
+// TODO: Allow user to change this
+char *error_page_path = "error_pages";
 
 size_t handle_get(hheader req, char **response, lru_table *cache) {
     char filepath[conf_max_filepath];
@@ -79,10 +88,61 @@ size_t handle_get(hheader req, char **response, lru_table *cache) {
     }
 }
 
-size_t add_200_header_http(char **response) {
-    size_t size_res = sizeof(header_200_http);
+// TODO: Add user handling of errors
+size_t handle_error(lua_State *_L, enum ERROR_STATUS status, char **response) {
+    char filepath[conf_max_filepath];
+    strlcpy(filepath, error_page_path, conf_max_filepath);
+    int file_found = 0;
+    size_t response_size = 0;
+
+    // Each case is required to check the file's existance
+    // Each case also sets the appropriate header
+    switch (status) {
+    case FORBIDDEN:
+        // 400
+        break;
+    case FILE_NOT_FOUND:
+        // 404
+        break;
+    case METHOD_NOT_ALLOWED:
+        // 405
+        break;
+    case INTERNAL_ERROR:
+        // 500
+        break;
+    case HTTP_PROTO_NOT_IMP:
+        // 505
+        break;
+    case REQUEST_TOO_LONG:
+        // 413
+        break;
+    case INVALID_REQUEST:
+        // 400
+        break;
+    case OK:
+        fprintf(stderr, "SHOULDN'T BE HERE\n");
+        exit(0);
+        break;
+    default:
+        fprintf(stderr, "ERROR NOT IMPLEMENTED");
+        exit(0);
+        break;
+    }
+
+    if (file_found) {
+        // Load file in response
+    } else {
+        response_size = sizeof(header_500_text);
+        *response = realloc(*response, response_size);
+        strlcpy(*response, header_500_text, response_size);
+    }
+    return response_size;
+}
+
+size_t add_200_header_html(char **response) {
+    size_t size_res = sizeof(header_200_html);
     *response = malloc(conf_buffer_size);
 
-    strlcpy(*response, header_200_http, conf_buffer_size);
+    strlcpy(*response, header_200_html, conf_buffer_size);
     return size_res;
 }

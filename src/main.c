@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <asm-generic/socket.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <lauxlib.h>
@@ -33,6 +34,7 @@ size_t conf_max_response_size = 16777216;
 size_t conf_max_cache_entries = 4;
 size_t conf_max_entry_size = 4096;
 char *conf_file_path;
+struct timeval clienttimeout = {5, 0};
 
 lua_State *L;
 lru_table *cache;
@@ -177,8 +179,10 @@ int main(int argc, char *argv[]) {
             if (getppid() != parentPID)
                 exit(1);
 
-            // TODO: Add a timeout for recv
-            size_t body_size, line_num, header_size = 0, req_size = 0;
+            setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, &clienttimeout,
+                       sizeof(clienttimeout));
+
+            size_t body_size = 0, line_num, header_size = 0, req_size = 0;
             hheader req_hheader;
             char *end_of_header = NULL;
             char **lines;
@@ -234,7 +238,6 @@ int main(int argc, char *argv[]) {
                     if (body_size == 0) {
                         lua_pushnil(L);
                         lua_setfield(L, -2, "body");
-                        fprintf(stderr, "No body attached\n");
                         error_status = OK;
                         break;
                     }
@@ -275,14 +278,18 @@ int main(int argc, char *argv[]) {
                         error_status = METHOD_NOT_ALLOWED;
                     }
                 }
-                if (response_size < 0) {
-                    error_status = response_size;
+                if ((long)response_size < 0) {
+                    error_status = (long)response_size;
                 }
             }
 
             if (error_status != OK) {
-                // TODO: Implement handling of invalid requests
-                exit(1);
+                fprintf(stderr, "Errored\n");
+                response_size = handle_error(L, error_status, &response);
+                if (response_size <= 0) {
+                    fprintf(stderr, "Error handling failed");
+                    exit(0);
+                }
             }
 
             /**

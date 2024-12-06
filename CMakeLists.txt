@@ -37,6 +37,6 @@ add_dependencies(${TARGET} lua)
 target_include_directories(${TARGET} PRIVATE ${LUA_INCLUDE_DIR})
 target_link_libraries(${TARGET} PRIVATE ${LUA_LIBRARIES})
 target_link_libraries(${TARGET} PRIVATE m)
-target_link_libraries(${TARGET} PRIVATE -lbsd)
+target_link_libraries(${TARGET} PRIVATE -lbsd -lrt)
 
 target_compile_options(${TARGET} PRIVATE -Wall -Wextra -Wpedantic)

@@ -16,7 +16,6 @@ This project is currently mostly incomplete and has many rough edges.
 - `cmake >= 3.22`
 - `gcc >= 11.4`
 - `libbsd >= 11.5`
-- `lua >= 5.1`
 
 ## Setup
 
@@ -58,45 +57,96 @@ The server will automatically serve these files when accessed via the browser.
 Lua scripts can handle specific HTTP requests dynamically. Below is an example of a Lua handler script:
 
 ```lua
-function handle_request(request)
+function dynamic_handler(request)
     if request.method == "GET" then
-        return 200, "Hello from Lua!"
+        return {
+            status = 200,
+            body = "Hello from the dynamic Lua handler!",
+            headers = { ["Content-Type"] = "text/plain" }
+        }
     elseif request.method == "POST" then
-        return 200, "Received POST data: " .. request.body
+        return {
+            status = 200,
+            body = "Received POST data: " .. (request.body or ""),
+            headers = { ["Content-Type"] = "text/plain" }
+        }
     else
-        return 405, "Method not allowed"
+        return {
+            status = 405,
+            body = "Method not allowed",
+            headers = { ["Content-Type"] = "text/plain" }
+        }
     end
+end
+
+-- Directly returning an HTML page as a string (for simple use cases)
+function html_handler(request)
+    return [[
+        <html>
+        <head><title>Simple HTML Response</title></head>
+        <body>
+            <h1>Welcome to the Lua-powered C Server</h1>
+            <p>This is a simple HTML response directly returned as a string.</p>
+        </body>
+        </html>
+    ]]
 end
 ```
 
 ### Integrating Lua Handlers
-1. Add the handler to your Lua configuration file:
+#### 1. Define the Handler Table:
+In the Lua handler table file (e.g., handler_table.lua), register handlers correctly. Use function names as strings on the left-hand side of the table:
+
    ```lua
    Handlers = {
-       ["/dynamic"] = handle_request
-   }
+    ["/dynamic"] = "dynamic_handler"
+}
    ```
-2. Access `http://<server_address>:<port>/dynamic` to trigger the Lua handler.
+#### 2. Avoid Direct Function Assignment:
+Assigning the function directly (e.g., "/dynamic" = dynamic_handler) can lead to issues due to the way Lua scripts are executed. By using the function name as a string, the server can load the function dynamically and correctly resolve dependencies.
 
----
+#### 3. Use Regex in the URI:
+The URI key in the Handlers table is treated as a regex pattern. For example:
 
-### 3. Command-Line Options
-RoxyHTTP provides several command-line options for customization:
+"/dynamic": Matches exactly /dynamic.
 
-| Option            | Description                                 |
-|-------------------|---------------------------------------------|
-| `--lua`           | Path to the Lua configuration file.         |
-| `--port`          | Specify a custom port (overrides `config`). |
-| `--log`           | Path to the log file for server activity.   |
+"/dynamic/.*": Matches /dynamic/anything.
 
-Example:
-```bash
-./roxyhttp --lua ../config.lua --port 9090
+Ensure the patterns align with your expected request URIs.
+
+### Loading Lua Handler Table
+
+#### File Separation
+
+- The Lua handler table file is separate from the main config file (e.g., config.conf).
+- Specify the path to the handler table in your C code when loading Lua scripts.
+
+#### Loading Handlers Dynamically
+
+The C server will read the Handlers table and dynamically call the function by its name:
 ```
+lua_getglobal(L, "Handlers");
+lua_pushstring(L, request_path); // Push the URI
+lua_gettable(L, -2); // Retrieve the handler name or nil
 
+if (lua_isstring(L, -1)) {
+    const char *handler_name = lua_tostring(L, -1);
+    lua_getglobal(L, handler_name); // Push the actual function
+    // Call the function with the request
+    lua_pcall(L, 1, 1, 0);
+} else {
+    fprintf(stderr, "No handler found for URI: %s\n", request_path);
+}
+```
+#### Accessing the Handler
+
+Once everything is set up, you can access the handler by sending a request to the URI curl http://127.0.0.1:8080/dynamic
+```
+POST: curl -X POST -d "data=example" http://127.0.0.1:8080/dynamic
+```
 ---
 
-### 4. Advanced Usage
+### 3. Advanced Usage
 
 ### Combining Static Files with Lua Scripting
 RoxyHTTP allows combining static file serving with dynamic Lua handlers. For example:
@@ -121,7 +171,7 @@ Max_cache_entry_size = 8192
 
 ---
 
-### 5. Troubleshooting and FAQs
+### 4. Troubleshooting and FAQs
 
 ### Common Issues
 
@@ -147,9 +197,11 @@ Max_cache_entry_size = 8192
   ```
 
 #### 3. **Cannot Load Handler Table File**
-**Cause**: Handlers are missing or incorrectly defined in `config.lua`.<br/>
+**Cause**: Handlers are missing or incorrectly defined in `handler.lua`.<br/>
 **Solution**:
 - Define handlers as shown in the [Dynamic Lua Handlers](#dynamic-lua-handlers) section.
+- Ensure handlers.lua and any other files it loads are correctly defined and accessible.
+
 
 ### FAQs
 
@@ -157,13 +209,13 @@ Max_cache_entry_size = 8192
 Edit the `Port` value in `config.lua` or use the `--port` command-line option.
 
 #### Where are server logs stored?
-Specify a log file path using the `--log` option or check `stderr` output.
+Check `stderr` output for the server logs.
 
 ---
 
 ## Examples
 
-### Example 1: Basic Static File Serving
+### Basic Static File Serving
 1. Create an `index.html` in the `pages` directory:
    ```html
    <html>
@@ -174,16 +226,5 @@ Specify a log file path using the `--log` option or check `stderr` output.
    ```
 2. Access the server in your browser at `http://localhost:8080`.
 
-### Example 2: Dynamic Greeting Handler
-1. Add the following handler in `config.lua`:
-   ```lua
-   Handlers = {
-       ["/greet"] = function(request)
-           return 200, "Hello, Lua world!"
-       end
-   }
-   ```
-2. Access `http://localhost:8080/greet`.
 
----
 

@@ -121,23 +121,6 @@ Ensure the patterns align with your expected request URIs.
 - The Lua handler table file is separate from the main config file (`config.lua`).
 - Specify the path to the handler table in `config.lua`.
 
-#### Loading Handlers Dynamically
-
-The C server will read the Handlers table and dynamically call the function by its name:
-```
-lua_getglobal(L, "Handlers");
-lua_pushstring(L, request_path); // Push the URI
-lua_gettable(L, -2); // Retrieve the handler name or nil
-
-if (lua_isstring(L, -1)) {
-    const char *handler_name = lua_tostring(L, -1);
-    lua_getglobal(L, handler_name); // Push the actual function
-    // Call the function with the request
-    lua_pcall(L, 1, 1, 0);
-} else {
-    fprintf(stderr, "No handler found for URI: %s\n", request_path);
-}
-```
 #### Accessing the Handler
 
 Once everything is set up, you can access the handler by sending a request to the URI curl http://127.0.0.1:8080/dynamic

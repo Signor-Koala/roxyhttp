@@ -137,21 +137,26 @@ RoxyHTTP allows combining static file serving with dynamic Lua handlers. For exa
 1. Serve static files from the `pages` directory.
 2. Define dynamic Lua routes for specific endpoints.
    ```lua
-   Filepath = "pages"
    Handlers = {
-       ["/api"] = function(request)
-           return 200, "API response: " .. os.date()
-       end
+       ["^/api$"] = "api_handler"
    }
+
+   function api_handler(request)
+       return {
+           status = 200,
+           headers = { ["Content-Type"] = "text/plain" }
+           body = "API response: " .. os.date()
+       }
+    end
+   
    ```
 
 ### Caching Configuration
 Customize caching options in `config.lua`:
 ```lua
-Max_cache_entry_number = 10
-Max_cache_entry_size = 8192
+Max_cache_entry_number = 10 -- Number of pages to be cached
+Max_cache_entry_size = 8192 -- Max size of a page that can be cached in bytes
 ```
-
 ---
 
 ### 4. Troubleshooting and FAQs

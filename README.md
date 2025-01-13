@@ -37,7 +37,7 @@ Currently tested with Arch Linux and Ubuntu 20.04 LTS
 ### Start the Server
 Run the server with the following command:
 ```bash
-./roxyhttp --lua /path/to/config.lua
+./roxyhttp
 ```
 
 ### Static File Directory
@@ -95,11 +95,11 @@ end
 
 ### Integrating Lua Handlers
 #### 1. Define the Handler Table:
-In the Lua handler table file (e.g., handler_table.lua), register handlers correctly. Use function names as strings on the left-hand side of the table:
+In the Lua handler table file (e.g., handler_table.lua), register handlers correctly. Use function names as strings as the values for the corresponding path patterns in the `Handlers` table:
 
    ```lua
    Handlers = {
-    ["/dynamic"] = "dynamic_handler"
+    ["^/dynamic"] = "dynamic_handler"
 }
    ```
 #### 2. Avoid Direct Function Assignment:
@@ -108,9 +108,9 @@ Assigning the function directly (e.g., "/dynamic" = dynamic_handler) can lead to
 #### 3. Use Regex in the URI:
 The URI key in the Handlers table is treated as a regex pattern. For example:
 
-"/dynamic": Matches exactly /dynamic.
+"^/dynamic$": Matches exactly /dynamic.
 
-"/dynamic/.*": Matches /dynamic/anything.
+"^/dynamic/.*$": Matches /dynamic/anything.
 
 Ensure the patterns align with your expected request URIs.
 
@@ -118,8 +118,8 @@ Ensure the patterns align with your expected request URIs.
 
 #### File Separation
 
-- The Lua handler table file is separate from the main config file (e.g., config.conf).
-- Specify the path to the handler table in your C code when loading Lua scripts.
+- The Lua handler table file is separate from the main config file (`config.lua`).
+- Specify the path to the handler table in `config.lua`.
 
 #### Loading Handlers Dynamically
 
@@ -206,7 +206,7 @@ Max_cache_entry_size = 8192
 ### FAQs
 
 #### How do I change the default port?
-Edit the `Port` value in `config.lua` or use the `--port` command-line option.
+Edit the `Port` value in `config.lua`.
 
 #### Where are server logs stored?
 Check `stderr` output for the server logs.

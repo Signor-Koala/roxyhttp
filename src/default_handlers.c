@@ -8,7 +8,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "cache.h"
 #include "main.h"
 #include "translate.h"
 
@@ -29,7 +28,7 @@ static const char header_500_text[] = "HTTP/1.1 500 Internal Server Error\r\n"
 // TODO: Allow user to change this
 char *error_page_path = "error_pages";
 
-size_t handle_get(hheader req, char **response, lru_table *cache) {
+size_t handle_get(hheader req, char **response) {
     char filepath[conf_max_filepath];
     strlcpy(filepath, conf_file_path, conf_max_filepath);
     *response = malloc(conf_buffer_size);
@@ -71,18 +70,12 @@ size_t handle_get(hheader req, char **response, lru_table *cache) {
         if (response_size > conf_buffer_size)
             *response = realloc(*response, st.st_size + header_size + 1);
 
-        if (get_cache(cache, *response, filepath)) {
-            return response_size;
-        }
-
         int fptr = open(filepath, O_RDONLY);
         for (uint i = 0; i < ((st.st_size) / conf_buffer_size) + 1; i++) {
             read(fptr, &(*response)[header_size + i * conf_buffer_size],
                  conf_buffer_size);
         }
         (*response)[response_size] = '\0';
-
-        update_cache(cache, filepath, *response, response_size + 1);
 
         return response_size;
     }

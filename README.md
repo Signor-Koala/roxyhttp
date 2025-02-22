@@ -151,12 +151,6 @@ RoxyHTTP allows combining static file serving with dynamic Lua handlers. For exa
    
    ```
 
-### Caching Configuration
-Customize caching options in `config.lua`:
-```lua
-Max_cache_entry_number = 10 -- Number of pages to be cached
-Max_cache_entry_size = 8192 -- Max size of a page that can be cached in bytes
-```
 ---
 
 ### 4. Troubleshooting and FAQs

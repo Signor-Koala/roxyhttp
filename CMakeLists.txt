@@ -29,9 +29,7 @@ add_executable(
   src/default_handlers.c
   src/default_handlers.h
   src/translate.c
-  src/translate.h
-  src/cache.c
-  src/cache.h)
+  src/translate.h)
 
 add_dependencies(${TARGET} lua)
 target_include_directories(${TARGET} PRIVATE ${LUA_INCLUDE_DIR})

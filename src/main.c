@@ -20,7 +20,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "cache.h"
 #include "default_handlers.h"
 #include "main.h"
 #include "translate.h"
@@ -31,14 +30,10 @@ char conf_port[6] = "8080";
 size_t conf_buffer_size = 8196;
 size_t conf_max_filepath = 256;
 size_t conf_max_response_size = 16777216;
-size_t conf_max_cache_entries = 4;
-size_t conf_max_entry_size = 4096;
 char *conf_file_path;
 struct timeval clienttimeout = {5, 0};
 
 lua_State *L;
-lru_table *cache;
-size_t cache_size;
 
 void sigchild_handler(int s) {
     int saved_errno = errno;
@@ -49,16 +44,6 @@ void sigchild_handler(int s) {
 
 void intHandler(int dummy) {
     fprintf(stderr, "Shutting down...\n");
-    if (pthread_mutex_lock(&(cache->lock))) {
-        perror("Failed to lock: ");
-        exit(1);
-    }
-    pthread_mutex_unlock(&(cache->lock));
-    if (munmap(cache, cache_size)) {
-        perror("Unlink: ");
-        exit(1);
-    }
-    shm_unlink("roxyhttp_cache");
     fprintf(stderr, "Goodbye\n");
     exit(0);
 }
@@ -87,15 +72,6 @@ int main(int argc, char *argv[]) {
     luaL_openlibs(L);
 
     conf_file_path = get_config(L);
-
-    cache_size = sizeof(lru_table) +
-                 conf_max_cache_entries *
-                     (conf_max_entry_size + conf_max_filepath * sizeof(char) +
-                      sizeof(long) + sizeof(size_t));
-    cache = create_cache();
-    pthread_mutexattr_t attrmutex;
-    pthread_mutexattr_setpshared(&attrmutex, PTHREAD_PROCESS_SHARED);
-    pthread_mutex_init(&(cache->lock), &attrmutex);
 
     init_handlers(L);
 
@@ -267,8 +243,7 @@ int main(int argc, char *argv[]) {
 
                 if (response_size == 0) {
                     if (!strcmp(req_hheader.method, "GET")) {
-                        response_size =
-                            handle_get(req_hheader, &response, cache);
+                        response_size = handle_get(req_hheader, &response);
                     } else {
                         error_status = METHOD_NOT_ALLOWED;
                     }

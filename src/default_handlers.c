@@ -19,6 +19,10 @@ static const char header_200_html[] = "HTTP/1.1 200 OK\r\n"
                                       "Content-Type: text/html\r\n"
                                       "\r\n";
 
+static const char header_404_html[] = "HTTP/1.1 404 Not Found\r\n"
+                                      "Content-Type: text/html\r\n"
+                                      "\r\n";
+
 static const char header_500_text[] = "HTTP/1.1 500 Internal Server Error\r\n"
                                       "Content-Type: text/plain\r\n"
                                       "Content-Length: 25\r\n"
@@ -87,6 +91,8 @@ size_t handle_error(lua_State *_L, enum ERROR_STATUS status, char **response) {
     strlcpy(filepath, error_page_path, conf_max_filepath);
     int file_found = 0;
     size_t response_size = 0;
+    size_t header_size = 0;
+    struct stat st;
 
     // Each case is required to check the file's existance
     // Each case also sets the appropriate header
@@ -95,6 +101,16 @@ size_t handle_error(lua_State *_L, enum ERROR_STATUS status, char **response) {
         // 400
         break;
     case FILE_NOT_FOUND:
+        if (stat("404.html", &st)) {
+            break;
+        } else {
+            header_size = strlcpy(*response, header_404_html, conf_buffer_size);
+
+            strlcpy(filepath, "404.html", conf_max_filepath);
+
+            response_size = header_size + st.st_size;
+            file_found = 1;
+        }
         // 404
         break;
     case METHOD_NOT_ALLOWED:
@@ -123,7 +139,16 @@ size_t handle_error(lua_State *_L, enum ERROR_STATUS status, char **response) {
     }
 
     if (file_found) {
-        // Load file in response
+        if (response_size > conf_buffer_size)
+            *response = realloc(*response, response_size + 1);
+
+        int fptr = open(filepath, O_RDONLY);
+        for (uint i = 0; i < ((st.st_size) / conf_buffer_size) + 1; i++) {
+            read(fptr, &(*response)[header_size + i * conf_buffer_size],
+                 conf_buffer_size);
+        }
+        (*response)[response_size] = '\0';
+
     } else {
         response_size = sizeof(header_500_text);
         *response = realloc(*response, response_size);

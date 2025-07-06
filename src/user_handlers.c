@@ -319,8 +319,7 @@ size_t build_response(lua_State *L, char **response) {
     return res_len;
 }
 
-size_t exec_handler(lua_State *L, hheader req_hh, char **response,
-                    char *handler_name) {
+size_t exec_middleware(lua_State *L, hheader req_hh) {
     int status;
     for (uint i = 0; i < middleware_table.n; i++) {
         status =
@@ -336,6 +335,12 @@ size_t exec_handler(lua_State *L, hheader req_hh, char **response,
             }
         }
     }
+    return 0;
+}
+
+size_t exec_handler(lua_State *L, hheader req_hh, char **response,
+                    char *handler_name) {
+
     lua_getglobal(L, handler_name);
     lua_insert(L, -2);
 

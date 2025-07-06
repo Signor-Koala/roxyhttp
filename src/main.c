@@ -56,6 +56,8 @@ void *get_in_addr(struct sockaddr *sa) {
 }
 
 int main(int argc, char *argv[]) {
+    printf("Starting up...\n");
+
     int server_sock, client_sock, rv;
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_storage their_addr;
@@ -229,6 +231,8 @@ int main(int argc, char *argv[]) {
                 close(client_sock);
                 exit(1);
             }
+            lua_pushstring(L, s);
+            lua_setfield(L, -2, "their_addr");
 
             /**
              * Construction of response based on the request
@@ -239,6 +243,12 @@ int main(int argc, char *argv[]) {
             char *response = NULL;
 
             if (error_status == OK) {
+
+                error_status = exec_middleware(L, req_hheader);
+                if (error_status != OK) {
+                    break;
+                }
+
                 response_size = get_handler_response(L, req_hheader, &response);
 
                 if (response_size == 0) {
